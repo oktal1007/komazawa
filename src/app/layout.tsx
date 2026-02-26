@@ -1,41 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { AdSenseScript } from "@/components/revenue/AdSense";
-import { GoogleAnalytics } from "@/components/revenue/GoogleAnalytics";
-import { WebsiteJsonLd } from "@/components/seo/JsonLd";
-import { siteConfig } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: {
-    default: siteConfig.title,
-    template: `%s | ${siteConfig.title}`,
-  },
-  description: siteConfig.description,
-  metadataBase: new URL(siteConfig.url),
-  openGraph: {
-    type: "website",
-    locale: "ja_JP",
-    siteName: siteConfig.title,
-    title: siteConfig.title,
-    description: siteConfig.description,
-  },
-  twitter: {
-    card: "summary_large_image",
-    creator: siteConfig.social.twitter
-      ? `@${siteConfig.social.twitter}`
-      : undefined,
-  },
-  alternates: {
-    types: {
-      "application/rss+xml": "/feed.xml",
-    },
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
+  title: "バステト神AI占い鑑定レポート自動生成",
+  description:
+    "月花の守猫 バステリア・ルアによる鑑定レポート自動生成システム",
 };
 
 export default function RootLayout({
@@ -45,15 +14,29 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja">
-      <head>
-        <AdSenseScript />
-        <WebsiteJsonLd />
-      </head>
-      <body className="flex min-h-screen flex-col bg-white antialiased">
-        <GoogleAnalytics />
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
+      <body className="min-h-screen bg-mystic antialiased">
+        <header className="border-b border-[rgba(201,168,76,0.2)] px-6 py-4">
+          <div className="mx-auto flex max-w-5xl items-center justify-between">
+            <a href="/" className="text-gold-gradient text-xl font-bold">
+              月花の守猫 バステリア・ルア
+            </a>
+            <nav className="flex gap-6 text-sm text-[#e8dcc8]/60">
+              <a href="/" className="hover:text-[#c9a84c] transition-colors">
+                TOP
+              </a>
+              <a
+                href="/divination"
+                className="hover:text-[#c9a84c] transition-colors"
+              >
+                鑑定作成
+              </a>
+            </nav>
+          </div>
+        </header>
+        <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+        <footer className="border-t border-[rgba(201,168,76,0.2)] px-6 py-6 text-center text-xs text-[#e8dcc8]/40">
+          <p>月の光と古代の叡智に包まれて — 月花の守猫 バステリア・ルア</p>
+        </footer>
       </body>
     </html>
   );

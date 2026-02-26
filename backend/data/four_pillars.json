@@ -1,0 +1,35 @@
+{
+  "heavenly_stems": {
+    "甲": {"element": "木", "yin_yang": "陽", "description": "大木のごとき生命力。成長と発展の気が宿ります。"},
+    "乙": {"element": "木", "yin_yang": "陰", "description": "花草のごとき柔軟さ。しなやかに環境に適応する力があります。"},
+    "丙": {"element": "火", "yin_yang": "陽", "description": "太陽のごとき輝き。情熱と明るさで周囲を照らします。"},
+    "丁": {"element": "火", "yin_yang": "陰", "description": "灯火のごとき温かさ。繊細な光で闇を優しく照らします。"},
+    "戊": {"element": "土", "yin_yang": "陽", "description": "山岳のごとき重厚さ。揺るぎない信念と安定感があります。"},
+    "己": {"element": "土", "yin_yang": "陰", "description": "田畑のごとき豊穣さ。すべてを受け入れ育む力があります。"},
+    "庚": {"element": "金", "yin_yang": "陽", "description": "剣のごとき鋭さ。決断力と正義感に満ちています。"},
+    "辛": {"element": "金", "yin_yang": "陰", "description": "宝石のごとき美しさ。洗練された感性と繊細さがあります。"},
+    "壬": {"element": "水", "yin_yang": "陽", "description": "大河のごとき包容力。知恵と流動性で道を切り拓きます。"},
+    "癸": {"element": "水", "yin_yang": "陰", "description": "雨露のごとき恵み。静かに万物を潤す慈愛があります。"}
+  },
+  "earthly_branches": {
+    "子": {"element": "水", "animal": "鼠", "description": "知恵と機敏さの象徴。新たな始まりのエネルギーが宿ります。"},
+    "丑": {"element": "土", "animal": "牛", "description": "忍耐と着実さの象徴。地道な努力が大きな実を結びます。"},
+    "寅": {"element": "木", "animal": "虎", "description": "勇気と行動力の象徴。力強く道を切り拓くエネルギーがあります。"},
+    "卯": {"element": "木", "animal": "兎", "description": "優雅さと平和の象徴。穏やかさの中に秘めた強さがあります。"},
+    "辰": {"element": "土", "animal": "龍", "description": "神秘と変容の象徴。天と地を繋ぐ壮大なエネルギーがあります。"},
+    "巳": {"element": "火", "animal": "蛇", "description": "知恵と再生の象徴。深い洞察力と変容の力があります。"},
+    "午": {"element": "火", "animal": "馬", "description": "情熱と活力の象徴。自由を愛し、高い理想に向かって駆けます。"},
+    "未": {"element": "土", "animal": "羊", "description": "慈愛と芸術の象徴。美しいものを愛し、人々を癒します。"},
+    "申": {"element": "金", "animal": "猿", "description": "知恵と機転の象徴。柔軟な思考で困難を乗り越えます。"},
+    "酉": {"element": "金", "animal": "鶏", "description": "美と完璧さの象徴。鋭い観察眼と洗練された感性があります。"},
+    "戌": {"element": "土", "animal": "犬", "description": "忠誠と信義の象徴。深い愛情と正義感に満ちています。"},
+    "亥": {"element": "水", "animal": "猪", "description": "勇猛と誠実の象徴。真っ直ぐな心で目標に向かいます。"}
+  },
+  "five_elements_interaction": {
+    "木": {"generates": "火", "overcomes": "土", "meaning": "成長と発展。春の生命力が宿ります。"},
+    "火": {"generates": "土", "overcomes": "金", "meaning": "情熱と変容。夏の輝きが宿ります。"},
+    "土": {"generates": "金", "overcomes": "水", "meaning": "安定と包容。季節の変わり目の調和が宿ります。"},
+    "金": {"generates": "水", "overcomes": "木", "meaning": "収穫と洗練。秋の実りが宿ります。"},
+    "水": {"generates": "木", "overcomes": "火", "meaning": "知恵と流動。冬の静けさが宿ります。"}
+  }
+}
