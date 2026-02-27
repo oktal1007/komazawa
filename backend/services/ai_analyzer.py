@@ -1,6 +1,7 @@
 """
-Claude AI-powered analyzer for review analysis and trend reporting.
-Uses the Anthropic Python SDK. Falls back to demo data when API key is not configured.
+Claude AI analyzer for review analysis and trend reporting.
+Uses the Anthropic Python SDK to generate insights from product reviews
+and market trend data. Falls back to demo data when API key is not configured.
 """
 
 import json
@@ -10,29 +11,24 @@ from typing import Any, Dict, List, Optional
 try:
     import anthropic
 except ImportError:
-    anthropic = None  # type: ignore[assignment]
+    anthropic = None  # type: ignore
 
 
 class AIAnalyzer:
-    """Claude AI analyzer for review analysis and trend reporting."""
+    """AI-powered analyzer using Claude for review analysis and trend reports."""
 
     MODEL = "claude-sonnet-4-20250514"
 
     def __init__(self) -> None:
         self.api_key: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
-        self._client: Optional[Any] = None
+        self.client: Optional[Any] = None
+        if self.api_key and anthropic:
+            self.client = anthropic.Anthropic(api_key=self.api_key)
 
     @property
     def is_configured(self) -> bool:
-        """Check if Anthropic API key is set."""
-        return bool(self.api_key and anthropic is not None)
-
-    @property
-    def client(self) -> Any:
-        """Lazy-initialize the Anthropic client."""
-        if self._client is None and self.is_configured:
-            self._client = anthropic.Anthropic(api_key=self.api_key)
-        return self._client
+        """Check if the Anthropic API key is configured."""
+        return self.client is not None
 
     async def analyze_reviews(
         self, reviews: List[Dict[str, Any]], asin: str
@@ -43,47 +39,46 @@ class AIAnalyzer:
         differentiation points, and strengths/weaknesses summary.
         """
         if not self.is_configured:
-            return self._get_demo_review_analysis(reviews, asin)
+            return self._get_mock_review_analysis(asin)
 
-        try:
-            reviews_text = "\n\n".join(
-                [
-                    f"Rating: {r.get('rating', 'N/A')}/5\n"
-                    f"Title: {r.get('title', 'N/A')}\n"
-                    f"Body: {r.get('body', 'N/A')}"
-                    for r in reviews[:100]
-                ]
-            )
+        reviews_text = "\n".join(
+            [
+                f"[Rating: {r.get('rating', 'N/A')}] {r.get('title', '')}: {r.get('body', '')}"
+                for r in reviews[:200]  # Limit to 200 reviews for token management
+            ]
+        )
 
-            prompt = f"""以下はAmazonの商品（ASIN: {asin}）のレビューです。
-日本語で詳細に分析してください。
+        prompt = f"""以下はAmazon商品（ASIN: {asin}）のレビュー一覧です。これらのレビューを分析して、以下の形式でJSON形式で回答してください。
 
-レビューデータ:
+レビュー:
 {reviews_text}
 
-以下のJSON形式で分析結果を返してください:
+以下のJSON形式で回答してください:
 {{
     "negative_categories": [
-        {{"category": "カテゴリ名", "count": 件数, "severity": "high/medium/low", "examples": ["具体例1", "具体例2"]}}
+        {{"category": "カテゴリ名", "count": 件数, "severity": "high/medium/low", "examples": ["例1", "例2"]}}
     ],
     "gap_analysis": [
-        {{"gap": "ギャップ内容", "opportunity": "改善チャンス", "priority": "high/medium/low"}}
+        {{"gap": "改善ポイント", "frequency": "high/medium/low", "opportunity": "ビジネス機会の説明"}}
     ],
     "differentiation_points": [
-        {{"point": "差別化ポイント", "description": "詳細説明", "implementation_difficulty": "easy/medium/hard"}}
+        {{"point": "差別化ポイント", "description": "詳細説明", "priority": "high/medium/low"}}
     ],
-    "strengths": ["強み1", "強み2"],
-    "weaknesses": ["弱み1", "弱み2"],
+    "strengths": [
+        {{"strength": "強み", "mention_count": 件数}}
+    ],
+    "weaknesses": [
+        {{"weakness": "弱み", "mention_count": 件数, "improvement_suggestion": "改善提案"}}
+    ],
     "overall_sentiment": {{
         "positive_ratio": 0.0,
-        "negative_ratio": 0.0,
         "neutral_ratio": 0.0,
-        "summary": "総合評価サマリー"
+        "negative_ratio": 0.0,
+        "summary": "全体的な感情の要約"
     }}
-}}
+}}"""
 
-JSONのみを返してください。説明文は不要です。"""
-
+        try:
             message = self.client.messages.create(
                 model=self.MODEL,
                 max_tokens=4096,
@@ -91,46 +86,46 @@ JSONのみを返してください。説明文は不要です。"""
             )
 
             response_text = message.content[0].text
+
             # Extract JSON from response
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0]
-
-            return json.loads(response_text.strip())
-
-        except Exception:
-            return self._get_demo_review_analysis(reviews, asin)
+            json_start = response_text.find("{")
+            json_end = response_text.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response_text[json_start:json_end])
+            else:
+                return {"error": "Failed to parse AI response", "raw": response_text}
+        except Exception as e:
+            return {"error": str(e)}
 
     async def generate_trend_report(
         self, trends_data: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Generate a weekly trend report with top ingredients,
-        predictions, and market entry timing advice.
+        Generate a weekly trend report using Claude AI.
+        Returns top 5 ingredients, predictions, and market entry timing.
         """
         if not self.is_configured:
-            return self._get_demo_trend_report(trends_data)
+            return self._get_mock_trend_report()
 
-        try:
-            trends_text = json.dumps(trends_data, ensure_ascii=False, indent=2)
+        trends_text = json.dumps(trends_data, ensure_ascii=False, indent=2)
 
-            prompt = f"""以下はサプリメント・健康食品市場の成分トレンドデータです。
-分析してレポートを作成してください。
+        prompt = f"""以下はサプリメント・健康食品市場の成分トレンドデータです。このデータを分析して、週次トレンドレポートを作成してください。
 
 トレンドデータ:
 {trends_text}
 
-以下のJSON形式でレポートを返してください:
+以下のJSON形式で回答してください:
 {{
+    "report_date": "YYYY-MM-DD",
     "top_ingredients": [
         {{
             "rank": 1,
             "name": "成分名",
             "mention_count": 件数,
-            "growth_rate": 成長率,
+            "growth_rate": 成長率（%）,
+            "trend_direction": "up/stable/down",
             "market_potential": "high/medium/low",
-            "recommendation": "推奨コメント"
+            "summary": "この成分に関するトレンドの要約"
         }}
     ],
     "predictions": [
@@ -138,22 +133,21 @@ JSONのみを返してください。説明文は不要です。"""
             "ingredient": "成分名",
             "prediction": "予測内容",
             "confidence": "high/medium/low",
-            "timeframe": "時期"
+            "timeframe": "3ヶ月/6ヶ月/1年"
         }}
     ],
     "market_entry_timing": [
         {{
             "ingredient": "成分名",
-            "timing": "now/soon/wait/avoid",
+            "recommended_timing": "今すぐ/3ヶ月以内/6ヶ月以内/様子見",
             "reason": "理由",
-            "competition_level": "high/medium/low"
+            "risk_level": "high/medium/low"
         }}
     ],
-    "summary": "週次サマリー"
-}}
+    "overall_market_summary": "市場全体の要約"
+}}"""
 
-JSONのみを返してください。"""
-
+        try:
             message = self.client.messages.create(
                 model=self.MODEL,
                 max_tokens=4096,
@@ -161,241 +155,247 @@ JSONのみを返してください。"""
             )
 
             response_text = message.content[0].text
-            if "```json" in response_text:
-                response_text = response_text.split("```json")[1].split("```")[0]
-            elif "```" in response_text:
-                response_text = response_text.split("```")[1].split("```")[0]
+            json_start = response_text.find("{")
+            json_end = response_text.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(response_text[json_start:json_end])
+            else:
+                return {"error": "Failed to parse AI response", "raw": response_text}
+        except Exception as e:
+            return {"error": str(e)}
 
-            return json.loads(response_text.strip())
-
-        except Exception:
-            return self._get_demo_trend_report(trends_data)
-
-    def _get_demo_review_analysis(
-        self, reviews: List[Dict[str, Any]], asin: str
-    ) -> Dict[str, Any]:
-        """Return realistic demo review analysis."""
-        total = len(reviews) if reviews else 11
-        negative = sum(1 for r in reviews if r.get("rating", 3) <= 2) if reviews else 4
-        positive = sum(1 for r in reviews if r.get("rating", 3) >= 4) if reviews else 5
-
+    def _get_mock_review_analysis(self, asin: str) -> Dict[str, Any]:
+        """Return realistic mock review analysis data."""
         return {
             "negative_categories": [
                 {
-                    "category": "効果実感の欠如",
-                    "count": 8,
+                    "category": "粒の大きさ・飲みにくさ",
+                    "count": 45,
                     "severity": "high",
                     "examples": [
-                        "1ヶ月飲んだが変化なし",
-                        "期待していた効果が感じられない",
+                        "粒が大きくて飲みにくい",
+                        "高齢者には辛いサイズ",
+                        "もう少し小さくしてほしい",
                     ],
                 },
                 {
-                    "category": "飲みにくさ（サイズ・匂い）",
-                    "count": 6,
+                    "category": "効果の実感がない",
+                    "count": 38,
                     "severity": "medium",
                     "examples": [
-                        "カプセルが大きくて飲み込みにくい",
-                        "開封時の匂いが気になる",
+                        "1ヶ月飲んでも変化なし",
+                        "期待したほどの効果は感じない",
+                        "プラセボかもしれない",
                     ],
                 },
                 {
-                    "category": "パッケージ・デザイン",
-                    "count": 4,
+                    "category": "パッケージの品質",
+                    "count": 28,
+                    "severity": "medium",
+                    "examples": [
+                        "ジッパーが閉まらない",
+                        "湿気やすい",
+                        "デザインが安っぽい",
+                    ],
+                },
+                {
+                    "category": "価格が高い",
+                    "count": 22,
                     "severity": "low",
                     "examples": [
-                        "パッケージが安っぽい",
-                        "チャックが閉めにくい",
+                        "含有量に対して割高",
+                        "継続するには高い",
+                        "もう少し安ければリピートする",
                     ],
                 },
                 {
-                    "category": "価格・コスパ",
-                    "count": 5,
+                    "category": "お腹の不調",
+                    "count": 15,
                     "severity": "medium",
                     "examples": [
-                        "毎月続けるには高い",
-                        "大容量パックがほしい",
-                    ],
-                },
-                {
-                    "category": "カスタマーサービス",
-                    "count": 3,
-                    "severity": "medium",
-                    "examples": [
-                        "定期便の解約が電話のみ",
-                        "問い合わせの返信が遅い",
+                        "お腹が緩くなった",
+                        "胃もたれする",
+                        "体質に合わなかった",
                     ],
                 },
             ],
             "gap_analysis": [
                 {
-                    "gap": "効果を実感できるまでの期間や目安の説明が不足",
-                    "opportunity": "飲用ガイド・期待管理コンテンツの充実で満足度向上",
-                    "priority": "high",
+                    "gap": "小粒タイプの需要",
+                    "frequency": "high",
+                    "opportunity": "高齢者や錠剤が苦手な層向けに小粒・分割可能なサプリメントの需要が高い。競合の多くが大粒タイプのため、差別化の好機。",
                 },
                 {
-                    "gap": "飲みやすさの選択肢が少ない",
-                    "opportunity": "小粒タブレット・グミ・粉末など剤形バリエーション展開",
-                    "priority": "high",
+                    "gap": "効果の可視化",
+                    "frequency": "high",
+                    "opportunity": "体感効果を測定・記録できるアプリ連携や、血液検査キット同梱など効果を実感できる仕組みの導入。",
                 },
                 {
-                    "gap": "品質エビデンスの可視化不足",
-                    "opportunity": "第三者検査結果のQRコード掲載で信頼性向上",
-                    "priority": "medium",
+                    "gap": "パッケージデザインの改善",
+                    "frequency": "medium",
+                    "opportunity": "遮光・防湿に優れた個包装タイプの需要。持ち運びやすさも重要なポイント。",
                 },
                 {
-                    "gap": "定期購入の柔軟性不足",
-                    "opportunity": "Web解約・スキップ機能の実装で継続率向上",
-                    "priority": "medium",
+                    "gap": "成分の透明性",
+                    "frequency": "medium",
+                    "opportunity": "第三者機関による検査結果の公開や、原料産地の開示を求める声が増加。トレーサビリティの確保が差別化要因に。",
                 },
             ],
             "differentiation_points": [
                 {
-                    "point": "効果実感プログラムの導入",
-                    "description": "30日チャレンジプログラムとして、毎日の体調チェックシート付属。実感できない場合の全額返金保証を強化",
-                    "implementation_difficulty": "easy",
+                    "point": "小粒設計 + 個包装",
+                    "description": "業界で少ない小粒（8mm以下）タイプを個包装で提供。飲みやすさと携帯性を両立。",
+                    "priority": "high",
                 },
                 {
-                    "point": "マルチフォーム展開",
-                    "description": "カプセル・タブレット・グミ・ドリンクなど複数の剤形を展開し、ユーザーの好みに対応",
-                    "implementation_difficulty": "medium",
+                    "point": "成分検査証明書の同梱",
+                    "description": "ロットごとの第三者機関検査結果を同梱し、成分含有量の信頼性を担保。",
+                    "priority": "high",
                 },
                 {
-                    "point": "トレーサビリティQRコード",
-                    "description": "製造ロットごとの検査結果をQRコードで確認可能にし、透明性で差別化",
-                    "implementation_difficulty": "medium",
+                    "point": "定期購入での体調管理サポート",
+                    "description": "LINE連携で毎日の体調記録とAI分析による効果の可視化機能を提供。",
+                    "priority": "medium",
                 },
                 {
-                    "point": "プレミアムパッケージデザイン",
-                    "description": "ギフト対応の高級感あるパッケージデザインで、セルフケア＋ギフト需要を取り込む",
-                    "implementation_difficulty": "easy",
+                    "point": "環境配慮パッケージ",
+                    "description": "バイオマスプラスチック使用のエコパッケージで環境意識の高い層にアピール。",
+                    "priority": "low",
                 },
             ],
             "strengths": [
-                "国内GMP工場製造による安心感・信頼性",
-                "高配合量でのコストパフォーマンス",
-                "第三者検査済みの品質管理",
-                "Amazon限定ブランドの認知度",
+                {"strength": "コストパフォーマンスの高さ", "mention_count": 89},
+                {"strength": "国内製造・GMP認定の安心感", "mention_count": 76},
+                {"strength": "成分含有量の多さ", "mention_count": 65},
+                {"strength": "定期購入の利便性", "mention_count": 43},
             ],
             "weaknesses": [
-                "効果実感までの期間が長く、途中離脱が多い",
-                "飲みやすさに課題（カプセルサイズ・匂い）",
-                "パッケージデザインが競合比で見劣り",
-                "カスタマーサポート体制の不足",
-                "成分含有量の透明性に改善余地",
+                {
+                    "weakness": "粒のサイズが大きい",
+                    "mention_count": 45,
+                    "improvement_suggestion": "直径8mm以下の小粒タイプに変更。または粉末・液体タイプの展開を検討。",
+                },
+                {
+                    "weakness": "効果の実感に時間がかかる",
+                    "mention_count": 38,
+                    "improvement_suggestion": "摂取ガイドラインの同梱と、期待値の適切な設定。3ヶ月継続プログラムの提案。",
+                },
+                {
+                    "weakness": "パッケージの密閉性",
+                    "mention_count": 28,
+                    "improvement_suggestion": "ジッパー式からスクリューキャップ式ボトルへの変更を検討。",
+                },
             ],
             "overall_sentiment": {
-                "positive_ratio": round(positive / max(total, 1), 2),
-                "negative_ratio": round(negative / max(total, 1), 2),
-                "neutral_ratio": round(
-                    (total - positive - negative) / max(total, 1), 2
-                ),
-                "summary": "全体的に品質と配合量への評価は高いが、効果実感の欠如と飲みやすさに課題。パッケージ改善と剤形バリエーションの追加で大幅な改善が見込める。",
+                "positive_ratio": 0.58,
+                "neutral_ratio": 0.22,
+                "negative_ratio": 0.20,
+                "summary": "全体的にポジティブな評価が多いが、粒の大きさとパッケージの品質に関する改善要望が目立つ。成分品質と価格のバランスは高く評価されている。新規参入者は小粒設計とパッケージ品質の改善で差別化が可能。",
             },
         }
 
-    def _get_demo_trend_report(
-        self, trends_data: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Return realistic demo trend report."""
+    def _get_mock_trend_report(self) -> Dict[str, Any]:
+        """Return realistic mock trend report data."""
         return {
+            "report_date": "2025-01-20",
             "top_ingredients": [
                 {
                     "rank": 1,
                     "name": "NMN（ニコチンアミドモノヌクレオチド）",
-                    "mention_count": 12500,
-                    "growth_rate": 45.2,
+                    "mention_count": 12450,
+                    "growth_rate": 34.5,
+                    "trend_direction": "up",
                     "market_potential": "high",
-                    "recommendation": "エイジングケア市場で急成長中。高純度・高配合の差別化が鍵。",
+                    "summary": "エイジングケア市場で急成長中。高純度・高含有量の製品が人気。価格帯は3,000〜15,000円と幅広い。",
                 },
                 {
                     "rank": 2,
-                    "name": "CBDオイル",
-                    "mention_count": 9800,
-                    "growth_rate": 38.7,
+                    "name": "エクオール",
+                    "mention_count": 8920,
+                    "growth_rate": 28.3,
+                    "trend_direction": "up",
                     "market_potential": "high",
-                    "recommendation": "ストレス・睡眠市場で需要拡大。法規制の動向に注意が必要。",
+                    "summary": "更年期対策として女性市場で急速に認知度が向上。大豆イソフラボンからの進化系として注目。",
                 },
                 {
                     "rank": 3,
-                    "name": "エクオール",
-                    "mention_count": 7200,
-                    "growth_rate": 28.3,
+                    "name": "乳酸菌・ビフィズス菌",
+                    "mention_count": 15600,
+                    "growth_rate": 12.1,
+                    "trend_direction": "stable",
                     "market_potential": "high",
-                    "recommendation": "更年期ケア市場で安定成長。女性向けブランディングが重要。",
+                    "summary": "腸活ブームの継続で安定成長。菌株の差別化が進み、特定の効果を謳う製品が増加。",
                 },
                 {
                     "rank": 4,
-                    "name": "GABA（ギャバ）",
-                    "mention_count": 6500,
-                    "growth_rate": 22.1,
+                    "name": "CBD（カンナビジオール）",
+                    "mention_count": 6780,
+                    "growth_rate": 45.2,
+                    "trend_direction": "up",
                     "market_potential": "medium",
-                    "recommendation": "機能性表示食品としての申請が差別化ポイント。",
+                    "summary": "リラックス・睡眠市場で急成長。ただし規制リスクと消費者の認知度にばらつきあり。",
                 },
                 {
                     "rank": 5,
-                    "name": "ラクトフェリン",
-                    "mention_count": 5100,
-                    "growth_rate": 18.5,
+                    "name": "クレアチン",
+                    "mention_count": 9340,
+                    "growth_rate": 18.7,
+                    "trend_direction": "up",
                     "market_potential": "medium",
-                    "recommendation": "免疫・腸活市場で堅調。品質認証の取得が信頼性向上に有効。",
+                    "summary": "筋トレ市場の拡大に伴い成長。フィットネスブームでターゲット層が女性にも拡大中。",
                 },
             ],
             "predictions": [
                 {
                     "ingredient": "NMN",
-                    "prediction": "2025年中に市場規模500億円突破の見込み。価格競争が激化し、品質差別化が重要に",
+                    "prediction": "価格競争が激化し、平均単価は下がるが市場規模は拡大。高純度差別化が重要に。",
                     "confidence": "high",
-                    "timeframe": "6ヶ月以内",
+                    "timeframe": "6ヶ月",
                 },
                 {
-                    "ingredient": "エルゴチオネイン",
-                    "prediction": "次世代アンチエイジング成分として注目度上昇中。NMNに次ぐ成長株",
+                    "ingredient": "エクオール",
+                    "prediction": "テレビCM効果で一般認知度がさらに上昇。大手メーカー参入により競争激化の可能性。",
                     "confidence": "medium",
-                    "timeframe": "12ヶ月以内",
+                    "timeframe": "3ヶ月",
                 },
                 {
-                    "ingredient": "ポストバイオティクス",
-                    "prediction": "プロバイオティクスの次のトレンドとして急浮上。腸活市場の新機軸",
+                    "ingredient": "ウロリチン",
+                    "prediction": "次のNMNとして注目度が急上昇の兆し。早期参入で先行者利益が期待できる。",
                     "confidence": "medium",
-                    "timeframe": "6-12ヶ月",
+                    "timeframe": "6ヶ月",
+                },
+                {
+                    "ingredient": "マグネシウム",
+                    "prediction": "SNSでのバズをきっかけに若年層での認知度が急上昇中。入浴剤市場との相乗効果も。",
+                    "confidence": "high",
+                    "timeframe": "3ヶ月",
                 },
             ],
             "market_entry_timing": [
                 {
                     "ingredient": "NMN",
-                    "timing": "now",
-                    "reason": "市場成長中だが競合増加。差別化戦略があれば参入価値あり",
-                    "competition_level": "high",
-                },
-                {
-                    "ingredient": "CBDオイル",
-                    "timing": "soon",
-                    "reason": "規制緩和の動きを確認しながら準備段階。法的リスク低減が優先",
-                    "competition_level": "medium",
+                    "recommended_timing": "今すぐ",
+                    "reason": "市場拡大中だが競争も激化。高純度・低価格の差別化で参入余地あり。",
+                    "risk_level": "medium",
                 },
                 {
                     "ingredient": "エクオール",
-                    "timing": "now",
-                    "reason": "更年期市場は安定成長。大手参入前の中価格帯に機会あり",
-                    "competition_level": "medium",
+                    "recommended_timing": "3ヶ月以内",
+                    "reason": "認知度上昇に伴い需要増加が見込まれる。OEM製造の準備期間を考慮すると今から動くべき。",
+                    "risk_level": "low",
                 },
                 {
-                    "ingredient": "エルゴチオネイン",
-                    "timing": "soon",
-                    "reason": "認知度がまだ低いが、先行者利益が期待できる成長期",
-                    "competition_level": "low",
+                    "ingredient": "ウロリチン",
+                    "recommended_timing": "6ヶ月以内",
+                    "reason": "まだ市場形成の初期段階。先行投資としてのリスクはあるが、先行者メリットが大きい。",
+                    "risk_level": "medium",
                 },
                 {
-                    "ingredient": "ラクトフェリン",
-                    "timing": "now",
-                    "reason": "免疫ケア需要は堅調。品質証明で差別化すれば参入余地あり",
-                    "competition_level": "medium",
+                    "ingredient": "CBD",
+                    "recommended_timing": "様子見",
+                    "reason": "規制環境が不透明。法改正の動向を注視してからの参入が安全。",
+                    "risk_level": "high",
                 },
             ],
-            "summary": "NMNとCBDが引き続きトレンドの中心。エイジングケアと睡眠・ストレスケアが二大成長カテゴリー。新規参入にはエクオールやエルゴチオネインが狙い目。品質証明と剤形の工夫が差別化の鍵となる。",
+            "overall_market_summary": "健康食品・サプリメント市場は堅調に成長を続けており、特にエイジングケア、腸活、女性の健康に関連する成分が好調。NMNとエクオールは参入のタイミングとして適切。消費者は成分の品質と透明性をますます重視する傾向にあり、第三者検査や原料のトレーサビリティが差別化の鍵となる。ECチャネルでの販売が引き続き主流で、Amazon FBAを活用した低リスクでの市場参入が有効。",
         }
-
-
-# Module-level singleton
-ai_analyzer = AIAnalyzer()
