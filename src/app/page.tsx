@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const CATEGORIES = [
   {
@@ -115,6 +117,48 @@ const CATEGORIES = [
 
 export default function TopPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [canvaAuth, setCanvaAuth] = useState<boolean | null>(null);
+  const [canvaLoading, setCanvaLoading] = useState(false);
+
+  const checkCanvaStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/canva/status`);
+      const data = await res.json();
+      setCanvaAuth(data.authenticated);
+    } catch {
+      setCanvaAuth(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkCanvaStatus();
+  }, [checkCanvaStatus]);
+
+  const handleCanvaConnect = async () => {
+    setCanvaLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/canva/authorize`);
+      const data = await res.json();
+      window.open(data.authorization_url, "_blank", "width=600,height=700");
+      // ポーリングで認証完了を検知
+      const interval = setInterval(async () => {
+        const statusRes = await fetch(`${API_URL}/api/canva/status`);
+        const statusData = await statusRes.json();
+        if (statusData.authenticated) {
+          setCanvaAuth(true);
+          setCanvaLoading(false);
+          clearInterval(interval);
+        }
+      }, 3000);
+      // 5分でポーリング停止
+      setTimeout(() => {
+        clearInterval(interval);
+        setCanvaLoading(false);
+      }, 300000);
+    } catch {
+      setCanvaLoading(false);
+    }
+  };
 
   const handleCopy = async (categoryId: string, template: string) => {
     await navigator.clipboard.writeText(template);
@@ -134,6 +178,36 @@ export default function TopPage() {
           古代エジプトの女神バステトの化身として、月の満ち欠けに合わせた霊視と
           数千年の叡智によってお客様の運命を鑑定いたします。
         </p>
+      </section>
+
+      {/* Canva Connection Status */}
+      <section className="card-mystic rounded-xl p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">
+              {canvaAuth === true ? "\u2705" : canvaAuth === false ? "\u26A0\uFE0F" : "\u2699\uFE0F"}
+            </span>
+            <div>
+              <h3 className="text-[#c9a84c] font-bold text-sm">Canva API</h3>
+              <p className="text-[#e8dcc8]/50 text-xs">
+                {canvaAuth === true
+                  ? "PDF\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u6E96\u5099\u5B8C\u4E86"
+                  : canvaAuth === false
+                  ? "\u8A8D\u8A3C\u304C\u5FC5\u8981\u3067\u3059"
+                  : "\u63A5\u7D9A\u78BA\u8A8D\u4E2D..."}
+              </p>
+            </div>
+          </div>
+          {canvaAuth !== true && (
+            <button
+              onClick={handleCanvaConnect}
+              disabled={canvaLoading}
+              className="btn-gold rounded-lg px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {canvaLoading ? "\u8A8D\u8A3C\u4E2D..." : "Canva\u3092\u9023\u643A"}
+            </button>
+          )}
+        </div>
       </section>
 
       {/* Category Cards */}

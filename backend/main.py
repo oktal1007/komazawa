@@ -4,6 +4,7 @@ import os
 from typing import Optional
 
 from dotenv import load_dotenv
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -13,8 +14,24 @@ from services.astrology import calculate_astrology
 from services.four_pillars import calculate_four_pillars
 from services.divination_generator import generate_divination_report
 from services.canva_exporter import CanvaExporter
+from services.canva_oauth import CanvaOAuth
 
 load_dotenv()
+
+# Canva OAuthインスタンス（グローバル）
+_canva_oauth: CanvaOAuth | None = None
+
+
+def get_canva_oauth() -> CanvaOAuth:
+    global _canva_oauth
+    if _canva_oauth is None:
+        client_id = os.getenv("CANVA_CLIENT_ID", "")
+        client_secret = os.getenv("CANVA_CLIENT_SECRET", "")
+        redirect_uri = os.getenv("CANVA_REDIRECT_URI", "http://127.0.0.1:8000/api/canva/callback")
+        if not client_id or not client_secret:
+            raise RuntimeError("CANVA_CLIENT_ID / CANVA_CLIENT_SECRET が未設定です")
+        _canva_oauth = CanvaOAuth(client_id, client_secret, redirect_uri)
+    return _canva_oauth
 
 app = FastAPI(
     title="バステト神AI占い鑑定レポート自動生成API",
@@ -133,13 +150,60 @@ async def generate_report(req: DivinationRequest):
 @app.post("/api/export-pdf", response_model=ExportPdfResponse)
 async def export_pdf(generated_content: dict):
     """Canva APIでPDFエクスポート"""
-    canva_token = os.getenv("CANVA_ACCESS_TOKEN")
+    oauth = get_canva_oauth()
+    canva_token = await oauth.get_valid_access_token()
     if not canva_token:
-        raise HTTPException(status_code=500, detail="CANVA_ACCESS_TOKEN is not set")
+        raise HTTPException(
+            status_code=401,
+            detail="Canva未認証です。先に /api/canva/authorize で認証してください",
+        )
 
     exporter = CanvaExporter(canva_token)
     result = await exporter.generate_pdf(generated_content)
     return ExportPdfResponse(**result)
+
+
+# --- Canva OAuth エンドポイント ---
+
+
+@app.get("/api/canva/authorize")
+async def canva_authorize():
+    """Canva OAuth認可URLを生成して返す"""
+    oauth = get_canva_oauth()
+    return oauth.get_authorization_url()
+
+
+@app.get("/api/canva/callback")
+async def canva_callback(code: str = "", state: str = "", error: str = ""):
+    """Canva OAuthコールバック。認可コードをトークンに交換"""
+    if error:
+        raise HTTPException(status_code=400, detail=f"Canva authorization error: {error}")
+    if not code or not state:
+        raise HTTPException(status_code=400, detail="Missing code or state parameter")
+
+    oauth = get_canva_oauth()
+    try:
+        token_data = await oauth.exchange_code(code, state)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Token exchange failed: {e.response.text}")
+
+    return {
+        "status": "success",
+        "message": "Canva認証が完了しました。このページを閉じてください。",
+        "expires_in": token_data.get("expires_in"),
+    }
+
+
+@app.get("/api/canva/status")
+async def canva_status():
+    """Canva認証状態を確認"""
+    oauth = get_canva_oauth()
+    token = await oauth.get_valid_access_token()
+    return {
+        "authenticated": token is not None,
+    }
 
 
 if __name__ == "__main__":

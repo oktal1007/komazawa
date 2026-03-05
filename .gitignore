@@ -41,6 +41,9 @@ __pycache__/
 .venv/
 backend/.venv/
 
+# Canva OAuth tokens
+.canva_tokens.json
+
 # vercel
 .vercel
 
