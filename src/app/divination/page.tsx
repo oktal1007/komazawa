@@ -95,8 +95,6 @@ function DivinationFormContent() {
     }
   }, [categoryParam]);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
   const updateForm = (field: keyof FormData, value: string | string[]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -129,7 +127,7 @@ function DivinationFormContent() {
     setStep("generating");
 
     try {
-      const response = await fetch(`${API_BASE}/api/generate`, {
+      const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -168,7 +166,7 @@ function DivinationFormContent() {
     setStep("exporting");
 
     try {
-      const response = await fetch(`${API_BASE}/api/export-pdf`, {
+      const response = await fetch("/api/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(generatedContent),

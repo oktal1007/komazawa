@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 const CATEGORIES = [
   {
     id: "love",
@@ -122,7 +120,7 @@ export default function TopPage() {
 
   const checkCanvaStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/canva/status`);
+      const res = await fetch("/api/canva/status");
       const data = await res.json();
       setCanvaAuth(data.authenticated);
     } catch {
@@ -137,12 +135,12 @@ export default function TopPage() {
   const handleCanvaConnect = async () => {
     setCanvaLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/canva/authorize`);
+      const res = await fetch("/api/canva/authorize");
       const data = await res.json();
       window.open(data.authorization_url, "_blank", "width=600,height=700");
       // ポーリングで認証完了を検知
       const interval = setInterval(async () => {
-        const statusRes = await fetch(`${API_URL}/api/canva/status`);
+        const statusRes = await fetch("/api/canva/status");
         const statusData = await statusRes.json();
         if (statusData.authenticated) {
           setCanvaAuth(true);
